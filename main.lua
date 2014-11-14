@@ -21,7 +21,7 @@ local debug = "?"
 function love.load()
     love.window.setMode( 128*6, 128*4)
     love.window.setTitle( "POOM 2 pre-alpha" )
-    --love.window.setFullscreen( true ,'desktop')
+    love.window.setFullscreen( true ,'desktop')
     love.mouse.setVisible(false)
 
     love.graphics.setDefaultFilter( 'nearest', 'nearest' )
@@ -91,6 +91,9 @@ function map_create_empty()
 end
 
 function map_start(map)
+  map[14][15] = 1
+  map[14][16] = 3
+  map[14][17] = 1
   map[15][16] = 4
   map[16][13] = 1
   map[16][14] = 1
@@ -180,7 +183,7 @@ function map_proc(key, x, y)
   debug = tile
 
   if key == 1 or key == 3 then
-    if tile == 1 or tile == 4 or tile == 5 then
+    if tile == 1 or tile == 2 or tile == 3 then
       return true
     else
       return false
@@ -188,7 +191,7 @@ function map_proc(key, x, y)
   end
 
   if key == 2 then
-    if tile == 4 or tile == 6 then
+    if tile == 2 or tile == 4 then
       return true
     else
       return false
@@ -196,7 +199,7 @@ function map_proc(key, x, y)
   end
 
   if key == 0 then
-    if tile == 4 or tile == 5 or tile == 6 then
+    if tile == 2 or tile == 3 or tile == 4 then
       return true
     else
       return false
@@ -207,7 +210,6 @@ function map_proc(key, x, y)
 end
 
 function player_move(i, key, dt)
-  i = i - 1
   bounds = 4
 
   if key=='right' and player[i].sy + bounds > 0 then
@@ -301,7 +303,7 @@ end
 
 function draw_player()
   for i=0,1 do
-    if joysticks[i] then
+    if joysticks[i+1] then
       player[i].animation:draw(player[i].sprite, ((player[i].x-map_x)*tile_size)+map_offset_x-(tile_size*2)+player[i].sx, ((player[i].y-map_y)*tile_size)+map_offset_y-(tile_size*2)+player[i].sy)
       love.graphics.draw(
         player[i].selector,
@@ -381,9 +383,9 @@ function love.update(dt)
       pan_map('left',dt)
      end
 
-    for i=1,2 do
-      if joysticks[i] then
-        joystick = joysticks[i]
+    for i=0,1 do
+      if joysticks[i+1] then
+        joystick = joysticks[i+1]
 
         player[i].animation:update(dt)
 
