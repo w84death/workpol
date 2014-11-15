@@ -14,9 +14,12 @@
 local anim8 = require 'libs.anim8'
 
 local STATE = 'intro'
-local camera_speed = 96
+local camera_speed = 64
 local player = {}
 local debug = "?"
+local camera = {}
+local timer = love.timer.getTime()
+local intro_time = 2
 
 function love.load()
     love.window.setMode( 128*6, 128*4)
@@ -65,11 +68,14 @@ function love.load()
 
     map_w = 32
     map_h = 32
-    map_x = 16-math.floor(map_display_w*0.5)
-    map_y = 16-math.floor(map_display_h*0.5)-2
+    map_x = 2
+    map_y = 2
 
     map = map_create_empty()
     map = map_start(map)
+
+    camera_target_x = 16-math.floor(map_display_w*0.5)
+    camera_target_y = 16-math.floor(map_display_h*0.5)
 
     -- gamepad
     local joysticks = love.joystick.getJoysticks()
@@ -142,6 +148,24 @@ function players_create()
     player[1].grid = anim8.newGrid(16, 16, player[1].sprite:getWidth(), player[1].sprite:getHeight())
     player[1].animation = anim8.newAnimation(player[1].grid('1-4',1), 0.1)
     player[1].selector = love.graphics.newImage( "assets/selector1.png" )
+end
+
+function camera_follow(dt)
+  camera_target_x = math.floor((player[0].x+player[1].x)*0.5)
+  camera_target_y = math.floor((player[0].y+player[1].y)*0.5)
+
+  if camera_target_x > map_x+math.floor(map_display_w*0.5) then
+    pan_map('right',dt)
+  end
+  if camera_target_x < map_x+math.floor(map_display_w*0.5) then
+    pan_map('left',dt)
+  end
+  if camera_target_y > map_y+math.floor(map_display_h*0.5) then
+    pan_map('down',dt)
+  end
+  if camera_target_y < map_y+math.floor(map_display_h*0.5) then
+    pan_map('up',dt)
+  end
 end
 
 function pan_map( key, dt )
@@ -259,7 +283,7 @@ function player_move(i, key, dt)
   end
 
   if key=='up' and map_proc(2,player[i].x, player[i].y) then
-    if player[i].sy > -tile_size*0.9 then
+    if player[i].sy > -tile_size*0.5 then
       player[i].sy = player[i].sy - player[i].speed * dt
     else
       if map_proc(0,player[i].x, player[i].y-1) then
@@ -338,7 +362,7 @@ function draw_gui()
   love.graphics.printf('1P '..p1_state, half_x-96-8, 10, 192,'right',0,0.5)
   love.graphics.printf('2P '..p2_state, half_x+8, 10, 192, 'left',0,0.5)
 
-  --love.graphics.printf(debug, 0, 0, 0, 'left',0,0.5)
+  love.graphics.printf(camera_target_x..' '..camera_target_y, 0, 0, 0, 'left',0,0.5)
 end
 
 function draw_game_over()
@@ -357,52 +381,113 @@ function love.draw()
   if STATE == 'game_over' then draw_game_over() end
 end
 
+function build_terrain(type, x,y)
+  local new_terrain = -1
+
+  if x > 1 and y > 1 and x <= map_w - 1 and y <= map_w - 1 then
+
+    if type == 'platform' then
+      if map[y][x] == 0 then
+        new_terrain = 1
+      end
+      if map[y][x] == 4 then
+        new_terrain = 3
+      end
+      if map[y][x] == 4 and map[y-1][x] == 4 then
+        new_terrain = 2
+      end
+
+    end
+
+    if type == 'ladder' then
+      if map[y][x] == 0 then
+        new_terrain = 4
+      end
+      if map[y][x] == 1 or map[y][x] == 3 then
+        new_terrain = 2
+      end
+    end
+
+    if new_terrain > 0 then
+      map[y][x] = new_terrain
+    end
+  end
+end
+
+
 function love.update(dt)
+  local can_move = true
   joysticks = love.joystick.getJoysticks()
 
   if STATE == 'intro' then
-    if love.keyboard.isDown('return') then
+    if love.timer.getTime() - timer > intro_time then
       STATE = 'game'
     end
   end
   if STATE == 'game' then
+    camera_follow(dt)
 
-    if love.keyboard.isDown('down') then
-      pan_map('down',dt)
-    end
+    -- if love.keyboard.isDown('down') then
+    --   camera_target_y = camera_target_y + 1
+    -- end
 
-     if love.keyboard.isDown('up') then
-      pan_map('up',dt)
-     end
+    --  if love.keyboard.isDown('up') then
+    --   camera_target_y = camera_target_y - 1
+    --  end
 
-     if love.keyboard.isDown('right') then
-      pan_map('right',dt)
-     end
+    --  if love.keyboard.isDown('right') then
+    --   camera_target_x = camera_target_x + 1
+    --  end
 
-     if love.keyboard.isDown('left') then
-      pan_map('left',dt)
-     end
+    --  if love.keyboard.isDown('left') then
+    --   camera_target_x = camera_target_x - 1
+    --  end
 
     for i=0,1 do
+      can_move = true
       if joysticks[i+1] then
         joystick = joysticks[i+1]
 
         player[i].animation:update(dt)
 
-        if joystick:getAxis(5)>0 then
-          player_move(i,'down',dt)
+        if joystick:isDown(1) then
+          if joystick:getAxis(4)>0 then
+            build_terrain('platform', player[i].x+1,player[i].y)
+          end
+          if joystick:getAxis(4)<0 then
+            build_terrain('platform', player[i].x-1,player[i].y)
+          end
+          build_terrain('platform', player[i].x,player[i].y)
+          can_move = false
         end
 
-        if joystick:getAxis(5)<0 then
-          player_move(i,'up',dt)
+        if joystick:isDown(2) then
+          if joystick:getAxis(5)>0 then
+            build_terrain('ladder', player[i].x,player[i].y+1)
+          end
+          if joystick:getAxis(5)<0 then
+            build_terrain('ladder', player[i].x,player[i].y-1)
+          end
+          build_terrain('ladder', player[i].x,player[i].y)
+          can_move = false
         end
 
-        if joystick:getAxis(4)>0 then
-          player_move(i,'right',dt)
-        end
+        if can_move then
+          if joystick:getAxis(5)>0 then
+            player_move(i,'down',dt)
+          end
 
-        if joystick:getAxis(4)<0 then
-          player_move(i,'left',dt)
+          if joystick:getAxis(5)<0 then
+            player_move(i,'up',dt)
+          end
+
+          if joystick:getAxis(4)>0 then
+            player_move(i,'right',dt)
+          end
+
+          if joystick:getAxis(4)<0 then
+            player_move(i,'left',dt)
+          end
         end
       end
     end
