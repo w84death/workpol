@@ -393,7 +393,7 @@ function build_terrain(type, x,y)
       if map[y][x] == 4 then
         new_terrain = 3
       end
-      if map[y][x] == 4 and map[y-1][x] == 4 then
+      if map[y][x] == 4 and ( map[y-1][x] == 4 or map[y-1][x] == 1 or map[y-1][x] == 3 ) then
         new_terrain = 2
       end
 
@@ -402,6 +402,9 @@ function build_terrain(type, x,y)
     if type == 'ladder' then
       if map[y][x] == 0 then
         new_terrain = 4
+        if map[y-1][x] == 1 then
+          map[y-1][x] = 3
+        end
       end
       if map[y][x] == 1 or map[y][x] == 3 then
         new_terrain = 2
@@ -450,28 +453,31 @@ function love.update(dt)
 
         player[i].animation:update(dt)
 
+        -- build platform
         if joystick:isDown(1) then
           if joystick:getAxis(4)>0 then
             build_terrain('platform', player[i].x+1,player[i].y)
-          end
-          if joystick:getAxis(4)<0 then
+          elseif joystick:getAxis(4)<0 then
             build_terrain('platform', player[i].x-1,player[i].y)
+          else
+            build_terrain('platform', player[i].x,player[i].y)
           end
-          build_terrain('platform', player[i].x,player[i].y)
           can_move = false
         end
 
+        -- build ladder
         if joystick:isDown(2) then
           if joystick:getAxis(5)>0 then
             build_terrain('ladder', player[i].x,player[i].y+1)
-          end
-          if joystick:getAxis(5)<0 then
+          elseif joystick:getAxis(5)<0 then
             build_terrain('ladder', player[i].x,player[i].y-1)
+          else
+            build_terrain('ladder', player[i].x,player[i].y)
           end
-          build_terrain('ladder', player[i].x,player[i].y)
           can_move = false
         end
 
+        -- move
         if can_move then
           if joystick:getAxis(5)>0 then
             player_move(i,'down',dt)
