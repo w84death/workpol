@@ -362,7 +362,7 @@ function draw_gui()
   love.graphics.printf('1P '..p1_state, half_x-96-8, 10, 192,'right',0,0.5)
   love.graphics.printf('2P '..p2_state, half_x+8, 10, 192, 'left',0,0.5)
 
-  love.graphics.printf(camera_target_x..' '..camera_target_y, 0, 0, 0, 'left',0,0.5)
+  --love.graphics.printf(camera_target_x..' '..camera_target_y, 0, 0, 0, 'left',0,0.5)
 end
 
 function draw_game_over()
