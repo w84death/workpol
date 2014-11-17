@@ -14,15 +14,34 @@
 local anim8 = require 'libs.anim8'
 
 local STATE = 'intro'
+local PHASE = 0
+local shrooms = false
+local tile_size = 16
+local scale = 4
+local scale_x = 4
+local scale_y = 4
+local scale_mx = 0
+local scale_my = 0
 local camera_speed = 64
 local player = {}
-local debug = "?"
+local entitie = {}
 local camera = {}
 local timer = love.timer.getTime()
-local intro_time = 2
+local intro_time = 2.5
+local message = ''
+local message_show = false
+local message_time = 2
+local message_speed = 300
+local message_pos_x = -100
+local progress = {}
+local coin = {}
+local build_time = 1
+local phase_timer = love.timer.getTime()
+local phase_0_time = 60
+--local phase_1_time = 120
 
 function love.load()
-    love.window.setMode( 128*6, 128*4)
+    love.window.setMode( 128*8, 128*5)
     love.window.setTitle( "POOM 2 pre-alpha" )
     love.window.setFullscreen( true ,'desktop')
     love.mouse.setVisible(false)
@@ -50,14 +69,10 @@ function love.load()
     --cursor = love.mouse.newCursor( "assets/pointer28.png", 8, 0 )
     --love.mouse.setCursor(cursor)
 
-    -- sprite vars
-    tile_size = 16
-    scale = 4
-
     -- map variables
     map_offset_x = 0
     map_offset_y = 0
-    map_display_w = math.floor(love.window.getWidth()/tile_size/scale)+2
+    map_display_w = math.floor(love.window.getWidth()/tile_size/scale)+3
     map_display_h = math.floor(love.window.getHeight()/tile_size/scale)+3
 
     center_x = math.floor(love.window.getWidth()/tile_size)
@@ -83,6 +98,23 @@ function love.load()
 
     players_create()
 
+    progress.sprite = love.graphics.newImage('assets/progress.png')
+    progress.grid = anim8.newGrid(16, 16, progress.sprite:getWidth(), progress.sprite:getHeight())
+    progress.animation = anim8.newAnimation(progress.grid('1-9',1), math.round(phase_0_time/9,2))
+
+
+    coin.sprite = love.graphics.newImage('assets/coin.png')
+    coin.grid = anim8.newGrid(16, 16, coin.sprite:getWidth(), coin.sprite:getHeight())
+    coin.animation = {}
+    coin.animation[0] = anim8.newAnimation(coin.grid('1-5',1), 0.1)
+    coin.animation[1] = anim8.newAnimation(coin.grid('1-5',1), 0.1)
+    coin.animation[2] = anim8.newAnimation(coin.grid('1-5',1), 0.1)
+    coin.animation[3] = anim8.newAnimation(coin.grid('1-5',1), 0.1)
+    coin.animation[4] = anim8.newAnimation(coin.grid('1-5',1), 0.1)
+    coin.animation[1]:gotoFrame(2)
+    coin.animation[2]:gotoFrame(3)
+    coin.animation[3]:gotoFrame(4)
+    coin.animation[4]:gotoFrame(5)
 end
 
 function map_create_empty()
@@ -117,6 +149,25 @@ function map_start(map)
   return map
 end
 
+function coins_create_on_map()
+  for y=0,map_h do
+    for x=0,map_w do
+      if map[y][x] == 1 or map[y][x] == 3 then
+        coin_insert(x,y)
+      end
+    end
+  end
+end
+
+function coin_insert(x,y)
+  local c = {}
+  c.coin = true
+  c.x = x
+  c.y = y
+  c.anim = math.floor(math.random()*#coin.animation)
+  table.insert(entitie,c)
+end
+
 function love.keypressed(k)
     if k == 'escape' then
         love.event.push('quit') -- Quit the game.
@@ -126,28 +177,29 @@ end
 
 function players_create()
   player[0] = {}
-    player[0].ready = false
-    player[0].x = 14
-    player[0].y = 16
-    player[0].sx = 0
-    player[0].sy = 0
-    player[0].speed = 100
-    player[0].sprite = love.graphics.newImage('assets/player0.png')
-    player[0].grid = anim8.newGrid(16, 16, player[0].sprite:getWidth(), player[0].sprite:getHeight())
-    player[0].animation = anim8.newAnimation(player[0].grid('1-4',1), 0.1)
-    player[0].selector = love.graphics.newImage( "assets/selector0.png" )
+  player[0].ready = false
+  player[0].x = 14
+  player[0].y = 16
+  player[0].sx = 0
+  player[0].sy = 0
+  player[0].speed = 100
+  player[0].sprite = love.graphics.newImage('assets/player0.png')
+  player[0].grid = anim8.newGrid(16, 16, player[0].sprite:getWidth(), player[0].sprite:getHeight())
+  player[0].animation = anim8.newAnimation(player[0].grid('1-4',1), 0.1)
+  player[0].selector = love.graphics.newImage( "assets/selector0.png" )
 
-    player[1] = {}
-    player[1].ready = false
-    player[1].x = 17
-    player[1].y = 16
-    player[1].sx = 0
-    player[1].sy = 0
-    player[1].speed = 100
-    player[1].sprite = love.graphics.newImage('assets/player1.png')
-    player[1].grid = anim8.newGrid(16, 16, player[1].sprite:getWidth(), player[1].sprite:getHeight())
-    player[1].animation = anim8.newAnimation(player[1].grid('1-4',1), 0.1)
-    player[1].selector = love.graphics.newImage( "assets/selector1.png" )
+  player[1] = {}
+  player[1].ready = false
+  player[1].x = 17
+  player[1].y = 16
+  player[1].sx = 0
+  player[1].sy = 0
+  player[1].speed = 100
+  player[1].sprite = love.graphics.newImage('assets/player1.png')
+  player[1].grid = anim8.newGrid(16, 16, player[1].sprite:getWidth(), player[1].sprite:getHeight())
+  player[1].animation = anim8.newAnimation(player[1].grid('1-4',1), 0.1)
+  player[1].animation:gotoFrame(3)
+  player[1].selector = love.graphics.newImage( "assets/selector1.png" )
 end
 
 function camera_follow(dt)
@@ -337,6 +389,21 @@ function draw_player()
   end
 end
 
+function draw_entitie()
+  local ex, ey, e, i,r
+
+  for i=0,#entitie do
+    if entitie[i] then
+      e = entitie[i]
+      ex = ((e.x-map_x)*tile_size)+map_offset_x-(tile_size*2)
+      ey = ((e.y-map_y)*tile_size)+map_offset_y-(tile_size*2)
+      if e.coin then
+        coin.animation[e.anim]:draw(coin.sprite, ex, ey)
+      end
+    end
+  end
+end
+
 function draw_intro()
   love.graphics.setBackgroundColor( 255, 255, 255 )
     --love.graphics.clear()
@@ -345,8 +412,22 @@ function draw_intro()
   love.graphics.printf("(c)2014 P1X", center_x, center_y+64, half_x*2, 'center',0,0.5)
 end
 
+math.round = function(num, idp)
+  local mult = 10^(idp or 0)
+  return math.floor(num * mult + 0.5) / mult
+end
+
+function show_message( msg )
+  message = msg
+  message_show = true
+  timer = love.timer.getTime()
+  message_pos_x = -100
+  message_speed = 300
+end
+
 function draw_gui()
   local half_x = math.floor(love.window.getWidth()/scale)*0.5
+  local half_y = math.floor(love.window.getHeight()/scale)*0.5
 
   p1_state = 'JOIN GAME'
   p2_state = 'JOIN GAME'
@@ -362,7 +443,19 @@ function draw_gui()
   love.graphics.printf('1P '..p1_state, half_x-96-8, 10, 192,'right',0,0.5)
   love.graphics.printf('2P '..p2_state, half_x+8, 10, 192, 'left',0,0.5)
 
-  --love.graphics.printf(camera_target_x..' '..camera_target_y, 0, 0, 0, 'left',0,0.5)
+  if PHASE == 0 then
+    progress.animation:draw(progress.sprite, half_x-8, 2)
+  end
+
+  if message_show then
+    if love.timer.getTime()-timer < message_time then
+      love.graphics.printf(message, message_pos_x, half_y-24, 0, 'center',0,1.5)
+    else
+      message_show = false
+    end
+  end
+
+  --love.graphics.printf(math.floor(10*scale_x) .. ' ' .. math.floor(10*scale_y), half_x, 14, 0, 'center',0,0.5)
 end
 
 function draw_game_over()
@@ -370,18 +463,26 @@ function draw_game_over()
 end
 
 function love.draw()
-  love.graphics.scale(scale, scale)
+  if shrooms then
+    love.graphics.translate(-100*scale_mx,100*scale_my)
+    love.graphics.scale(scale_x, scale_y)
+  else
+    love.graphics.scale(scale, scale)
+  end
 
   if STATE == 'intro' then draw_intro() end
   if STATE == 'game' then
     draw_map()
+    if PHASE == 1 then
+      draw_entitie()
+    end
     draw_player()
     draw_gui()
   end
   if STATE == 'game_over' then draw_game_over() end
 end
 
-function build_terrain(type, x,y)
+function build_terrain(type,x,y)
   local new_terrain = -1
 
   if x > 1 and y > 1 and x <= map_w - 1 and y <= map_w - 1 then
@@ -411,7 +512,14 @@ function build_terrain(type, x,y)
       end
     end
 
-    if new_terrain > 0 then
+      if new_terrain > 0 then
+        if map[y][x] == 4 and new_terrain == 3 then
+          for i=0,1 do
+            if player[i].x == x and player[i].y == y then
+              player[i].sy = 0
+            end
+          end
+        end
       map[y][x] = new_terrain
     end
   end
@@ -422,59 +530,77 @@ function love.update(dt)
   local can_move = true
   joysticks = love.joystick.getJoysticks()
 
+  if shrooms then
+    scale_mx = math.sin(love.timer.getTime())*0.25
+    scale_my = math.sin(love.timer.getTime())*0.25
+    scale_x = 4 + scale_mx
+    scale_y = 4 - scale_my
+  end
+
   if STATE == 'intro' then
     if love.timer.getTime() - timer > intro_time then
       STATE = 'game'
+      phase_timer = love.timer.getTime()
+      show_message('BUILD PHASE STARTED')
     end
   end
   if STATE == 'game' then
     camera_follow(dt)
+    progress.animation:update(dt)
 
-    -- if love.keyboard.isDown('down') then
-    --   camera_target_y = camera_target_y + 1
-    -- end
+    if PHASE == 0 then
+      if love.timer.getTime() - phase_timer > phase_0_time then
+        PHASE = 1
+        phase_timer = love.timer.getTime()
+        coins_create_on_map()
+        show_message('SURVIVAL PHASE STARTED')
+      end
+    end
 
-    --  if love.keyboard.isDown('up') then
-    --   camera_target_y = camera_target_y - 1
-    --  end
+    if PHASE == 1 then
+      for i=0,#coin.animation do
+       coin.animation[i]:update(dt)
+      end
 
-    --  if love.keyboard.isDown('right') then
-    --   camera_target_x = camera_target_x + 1
-    --  end
-
-    --  if love.keyboard.isDown('left') then
-    --   camera_target_x = camera_target_x - 1
-    --  end
+    end
 
     for i=0,1 do
       can_move = true
+
       if joysticks[i+1] then
         joystick = joysticks[i+1]
 
         player[i].animation:update(dt)
 
-        -- build platform
-        if joystick:isDown(1) then
-          if joystick:getAxis(4)>0 then
-            build_terrain('platform', player[i].x+1,player[i].y)
-          elseif joystick:getAxis(4)<0 then
-            build_terrain('platform', player[i].x-1,player[i].y)
-          else
-            build_terrain('platform', player[i].x,player[i].y)
+        if PHASE == 0 then
+          -- build platform
+          if joystick:isDown(1) then
+            if joystick:getAxis(4)>0 then
+              build_terrain('platform', player[i].x+1,player[i].y)
+            elseif joystick:getAxis(4)<0 then
+              build_terrain('platform', player[i].x-1,player[i].y)
+            else
+              build_terrain('platform', player[i].x,player[i].y)
+            end
+            can_move = false
           end
-          can_move = false
+
+          -- build ladder
+          if joystick:isDown(2) then
+            if joystick:getAxis(5)>0 then
+              build_terrain('ladder', player[i].x,player[i].y+1)
+            elseif joystick:getAxis(5)<0 then
+              build_terrain('ladder', player[i].x,player[i].y-1)
+            else
+              build_terrain('ladder', player[i].x,player[i].y)
+            end
+            can_move = false
+          end
         end
 
-        -- build ladder
-        if joystick:isDown(2) then
-          if joystick:getAxis(5)>0 then
-            build_terrain('ladder', player[i].x,player[i].y+1)
-          elseif joystick:getAxis(5)<0 then
-            build_terrain('ladder', player[i].x,player[i].y-1)
-          else
-            build_terrain('ladder', player[i].x,player[i].y)
-          end
-          can_move = false
+        if joystick:isDown(3) then
+          shrooms = not shrooms
+          return
         end
 
         -- move
@@ -494,8 +620,17 @@ function love.update(dt)
           if joystick:getAxis(4)<0 then
             player_move(i,'left',dt)
           end
+        else
+          player[i].px = player[i].x
+          player[i].py = player[i].y
         end
       end
+    end
+
+    if message_show then
+      message_pos_x = message_pos_x + (message_speed*dt)
+      if message_pos_x > love.window.getWidth()/scale*0.4 then message_speed = 24 end
+      if love.timer.getTime()-timer > message_time*0.8 then message_speed = 400 end
     end
 
   end
