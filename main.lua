@@ -43,10 +43,18 @@ local phase_0_time = 60
 function love.load()
     love.window.setMode( 128*8, 128*5)
     love.window.setTitle( "POOM 2 pre-alpha" )
-    love.window.setFullscreen( true ,'desktop')
+    --love.window.setFullscreen( true ,'desktop')
     love.mouse.setVisible(false)
 
     love.graphics.setDefaultFilter( 'nearest', 'nearest' )
+
+    -- shaders
+    canvas = love.graphics.newCanvas()
+    shader = love.graphics.newShader("shaders/scale4xhq.frag")
+    --shader = love.graphics.newShader("shaders/CRT.frag")
+    -- shader:send('inputSize', {love.graphics.getWidth(), love.graphics.getHeight()})
+    -- shader:send('textureSize', {love.graphics.getWidth(), love.graphics.getHeight()})
+    -- shader:send('outputSize', {love.graphics.getWidth(), love.graphics.getHeight()})
 
     -- load sprites
     tile = {}
@@ -178,6 +186,7 @@ end
 function players_create()
   player[0] = {}
   player[0].ready = false
+  player[0].score = 0
   player[0].x = 14
   player[0].y = 16
   player[0].sx = 0
@@ -190,6 +199,7 @@ function players_create()
 
   player[1] = {}
   player[1].ready = false
+  player[1].score = 0
   player[1].x = 17
   player[1].y = 16
   player[1].sx = 0
@@ -285,6 +295,17 @@ function map_proc(key, x, y)
   return false
 end
 
+function collect_coin(p)
+  for i=0,#entitie do
+    if entitie[i] then
+      if entitie[i].coin and entitie[i].x == player[p].x and entitie[i].y == player[p].y then
+        entitie[i].coin = false
+        player[p].score = player[p].score + 50
+      end
+    end
+  end
+end
+
 function player_move(i, key, dt)
   bounds = 4
 
@@ -299,6 +320,7 @@ function player_move(i, key, dt)
         if player[i].sx >= tile_size*0.5 then
           player[i].sx = -tile_size*0.5
           player[i].x = player[i].x + 1
+          collect_coin(i)
         end
       end
     end
@@ -315,6 +337,7 @@ function player_move(i, key, dt)
         if player[i].sx <= -tile_size*0.5 then
           player[i].sx = tile_size*0.5
           player[i].x = player[i].x - 1
+          collect_coin(i)
         end
       end
     end
@@ -329,6 +352,7 @@ function player_move(i, key, dt)
         if player[i].sy >= 0 then
           player[i].sy = -tile_size*0.9
           player[i].y = player[i].y + 1
+          collect_coin(i)
         end
       end
     end
@@ -343,6 +367,7 @@ function player_move(i, key, dt)
         if player[i].sy <= -tile_size*0.9 then
           player[i].sy = 0
           player[i].y = player[i].y - 1
+          collect_coin(i)
         end
       end
     end
@@ -379,13 +404,13 @@ end
 
 function draw_player()
   for i=0,1 do
-    if joysticks[i+1] then
+    --if joysticks[i+1] then
       player[i].animation:draw(player[i].sprite, ((player[i].x-map_x)*tile_size)+map_offset_x-(tile_size*2)+player[i].sx, ((player[i].y-map_y)*tile_size)+map_offset_y-(tile_size*2)+player[i].sy)
       love.graphics.draw(
         player[i].selector,
         ((player[i].x-map_x)*tile_size)+map_offset_x-(tile_size*2),
         ((player[i].y-map_y)*tile_size)+map_offset_y-(tile_size*2))
-    end
+    --end
   end
 end
 
@@ -437,8 +462,8 @@ function draw_gui()
   if joysticks[1] then p1_state = 'READY' end
   if joysticks[2] then p2_state = 'READY' end
 
-  love.graphics.printf(p1_score, half_x-64-8, 2, 128,'right',0,0.5)
-  love.graphics.printf(p2_score, half_x+8, 2, 128, 'left',0,0.5)
+  love.graphics.printf(player[0].score, half_x-64-8, 2, 128,'right',0,0.5)
+  love.graphics.printf(player[1].score, half_x+8, 2, 128, 'left',0,0.5)
 
   love.graphics.printf('1P '..p1_state, half_x-96-8, 10, 192,'right',0,0.5)
   love.graphics.printf('2P '..p2_state, half_x+8, 10, 192, 'left',0,0.5)
@@ -463,12 +488,14 @@ function draw_game_over()
 end
 
 function love.draw()
-  if shrooms then
-    love.graphics.translate(-100*scale_mx,100*scale_my)
-    love.graphics.scale(scale_x, scale_y)
-  else
-    love.graphics.scale(scale, scale)
-  end
+  love.graphics.scale(2, 2)
+  love.graphics.setCanvas(canvas)
+  -- if shrooms then
+  --   love.graphics.translate(-100*scale_mx,100*scale_my)
+  --   love.graphics.scale(scale_x, scale_y)
+  -- else
+  --   love.graphics.scale(2, 2)
+  -- end
 
   if STATE == 'intro' then draw_intro() end
   if STATE == 'game' then
@@ -480,6 +507,10 @@ function love.draw()
     draw_gui()
   end
   if STATE == 'game_over' then draw_game_over() end
+  love.graphics.setCanvas()
+  love.graphics.setShader(shader)
+  love.graphics.draw(canvas)
+  love.graphics.setShader()
 end
 
 function build_terrain(type,x,y)
@@ -563,6 +594,24 @@ function love.update(dt)
       end
 
     end
+
+    if love.keyboard.isDown('down') then
+      player_move(0,'down',dt)
+    end
+
+    if love.keyboard.isDown('up') then
+      player_move(0,'up',dt)
+    end
+
+    if love.keyboard.isDown('right') then
+      player_move(0,'right',dt)
+    end
+
+    if love.keyboard.isDown('left') then
+      player_move(0,'left',dt)
+    end
+
+    player[0].animation:update(dt)
 
     for i=0,1 do
       can_move = true
