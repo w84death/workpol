@@ -198,6 +198,11 @@ function Animation:clone()
   return newAnim
 end
 
+function Animation:flip(flipped)
+  self.flippedH = flipped
+  return self
+end
+
 function Animation:flipH()
   self.flippedH = not self.flippedH
   return self
