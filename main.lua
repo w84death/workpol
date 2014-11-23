@@ -54,11 +54,6 @@ function love.load()
     love.graphics.setDefaultFilter( 'nearest', 'nearest' )
     love.graphics.setBackgroundColor( 247, 226, 107 )
 
-    -- shaders
-    canvas = love.graphics.newCanvas()
-    canvas_gui = love.graphics.newCanvas()
-    shader = love.graphics.newShader("shaders/SCALE4xhq.frag")    --hader:send('outputSize', {love.graphics.getWidth(), love.graphics.getHeight()})
-
     -- load sprites
     tile = {}
     for i=1,7 do
@@ -458,7 +453,7 @@ end
 function draw_player()
   for i=0,1 do
     --if joysticks[i+1] then
-      player[i].animation[player[i].anim_current]:resume()
+      --player[i].animation[player[i].anim_current]:resume()
       player[i].animation[player[i].anim_current]:draw(player[i].sprite, ((player[i].x-map_x)*TILE_SIZE)+map_offset_x-(TILE_SIZE*2)+player[i].sx, ((player[i].y-map_y)*TILE_SIZE)+map_offset_y-(TILE_SIZE*2)+player[i].sy)
       player[i].animation[player[i].anim_current]:flip(player[i].flip)
       if player[i].standing and player[i].anim_time > PLAYER_ANIM_TIME then
@@ -466,7 +461,7 @@ function draw_player()
         player[i].anim_time = 0
       end
       if not player[i].standing and player[i].anim_time > PLAYER_ANIM_TIME then
-        player[i].animation[player[i].anim_current]:pause()
+        player[i].animation[2]:pause()
         player[i].anim_time = 0
       end
       love.graphics.draw(
@@ -551,37 +546,27 @@ function draw_game_over()
 end
 
 function love.draw()
-  love.graphics.scale(SCALE*0.5, SCALE*0.5)
-  canvas_gui:clear()
-  love.graphics.setCanvas(canvas)
+  if SHROOMS then
+    love.graphics.translate(-100*SCALE_mx,100*SCALE_my)
+    love.graphics.scale(SCALE_x, SCALE_y)
+  else
+    love.graphics.scale(SCALE, SCALE)
+  end
 
-  -- if SHROOMS then
-  --   love.graphics.translate(-100*SCALE_mx,100*SCALE_my)
-  --   love.graphics.SCALE(SCALE_x, SCALE_y)
-  -- else
-  --   love.graphics.SCALE(2, 2)
-  -- end
-
+  if STATE == 'intro' then
+    draw_intro()
+  end
   if STATE == 'game' then
     draw_map()
     if PHASE == 1 then
       draw_entitie()
     end
     draw_player()
-    -- draw_gui()
+    draw_gui()
   end
-  if STATE == 'game_over' then draw_game_over() end
-
-  love.graphics.setCanvas(canvas_gui)
-
-  if STATE == 'intro' then draw_intro() end
-  if STATE == 'game' then draw_gui() end
-
-  love.graphics.setCanvas()
-  love.graphics.setShader(shader)
-  love.graphics.draw(canvas)
-  love.graphics.setShader()
-  love.graphics.draw(canvas_gui)
+  if STATE == 'game_over' then
+    draw_game_over()
+  end
 end
 
 function build_terrain(type,x,y)
