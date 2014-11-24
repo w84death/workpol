@@ -22,8 +22,10 @@ local BUILD_TIME = 1
 local PHASE_0_TIME = 10
 local PLAYER_ANIM_TIME = 1
 local SHROOMS = false
+local MAP_SIZE = 64
+local PLAYERS = 1
 
-local SCALE = 4
+local SCALE = 3
 local SCALE_x = 4
 local SCALE_y = 4
 local SCALE_mx = 0
@@ -87,8 +89,8 @@ function love.load()
 
     -- map
 
-    map_w = 32
-    map_h = 32
+    map_w = MAP_SIZE
+    map_h = MAP_SIZE
     map_x = 2
     map_y = 2
 
