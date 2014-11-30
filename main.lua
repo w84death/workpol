@@ -16,7 +16,8 @@ local anim8 = require 'libs.anim8'
 local STATE = 'intro'
 local PHASE = 0
 local TILE_SIZE = 16
-local CAMERA_SPEED = 64
+local CAMERA_SPEED = 96
+local CAMERA_CAGE = 1.5
 local INTRO_TIME = 2.5
 local BUILD_TIME = 1
 local PHASE_0_TIME = 10
@@ -30,6 +31,8 @@ local SCALE_x = 4
 local SCALE_y = 4
 local SCALE_mx = 0
 local SCALE_my = 0
+local SCREEN_W = 160*SCALE
+local SCREEN_H = 144*SCALE
 
 local player = {}
 local entitie = {}
@@ -45,10 +48,8 @@ local progress = {}
 local coin = {}
 local phase_timer = love.timer.getTime()
 
-
-
 function love.load()
-    love.window.setMode( 128*8, 128*5)
+    love.window.setMode( SCREEN_W, SCREEN_H)
     love.window.setTitle( "POOM 2 pre-alpha" )
     --love.window.setFullscreen( true ,'desktop')
     love.mouse.setVisible(false)
@@ -57,12 +58,14 @@ function love.load()
     love.graphics.setBackgroundColor( 247, 226, 107 )
 
     -- load sprites
+    p1x_logo = love.graphics.newImage( "assets/p1x.png" )
     tile = {}
+    back_tile = {}
+
     for i=1,7 do
       tile[i] = love.graphics.newImage( "assets/tile_"..i..".png" )
     end
 
-    back_tile = {}
     for i=1,4 do
       back_tile[i] = love.graphics.newImage( "assets/back_tile_"..i..".png" )
     end
@@ -233,19 +236,26 @@ function players_create()
 end
 
 function camera_follow(dt)
-  camera_target_x = math.floor((player[0].x+player[1].x)*0.5)
-  camera_target_y = math.floor((player[0].y+player[1].y)*0.5)
 
-  if camera_target_x > map_x+math.floor(map_display_w*0.5) then
+  if (PLAYERS == 2) then
+    camera_target_x = math.floor((player[0].x+player[1].x)*0.5)
+    camera_target_y = math.floor((player[0].y+player[1].y)*0.5)
+    CAMERA_CAGE = 1
+  else
+    camera_target_x = player[0].x
+    camera_target_y = player[0].y
+  end
+
+  if camera_target_x - CAMERA_CAGE > map_x+math.floor(map_display_w*0.5) then
     pan_map('right',dt)
   end
-  if camera_target_x < map_x+math.floor(map_display_w*0.5) then
+  if camera_target_x + CAMERA_CAGE < map_x+math.floor(map_display_w*0.5) then
     pan_map('left',dt)
   end
-  if camera_target_y > map_y+math.floor(map_display_h*0.5) then
+  if camera_target_y - CAMERA_CAGE > map_y+math.floor(map_display_h*0.5) then
     pan_map('down',dt)
   end
-  if camera_target_y < map_y+math.floor(map_display_h*0.5) then
+  if camera_target_y + CAMERA_CAGE < map_y+math.floor(map_display_h*0.5) then
     pan_map('up',dt)
   end
 end
@@ -339,9 +349,9 @@ function coin_count_all()
 end
 
 function player_move(i, key, dt)
-  bounds = 4
+  bounds = 6
 
-  if key=='right' and player[i].sy + bounds > 0 then
+  if key=='right' and player[i].sy + bounds > 0  then
     if player[i].sx + bounds < TILE_SIZE*0.5 then
         player[i].sx = player[i].sx + player[i].speed * dt
         player[i].sy = 0
@@ -453,7 +463,7 @@ function draw_map()
 end
 
 function draw_player()
-  for i=0,1 do
+  for i=0,PLAYERS-1 do
     --if joysticks[i+1] then
       --player[i].animation[player[i].anim_current]:resume()
       player[i].animation[player[i].anim_current]:draw(player[i].sprite, ((player[i].x-map_x)*TILE_SIZE)+map_offset_x-(TILE_SIZE*2)+player[i].sx, ((player[i].y-map_y)*TILE_SIZE)+map_offset_y-(TILE_SIZE*2)+player[i].sy)
@@ -490,11 +500,19 @@ function draw_entitie()
 end
 
 function draw_intro()
-  -- love.graphics.setBackgroundColor( 255, 255, 255 )
-  --love.graphics.clear()
-  local half_x = math.floor(love.window.getWidth()/SCALE)*0.5
-  love.graphics.printf("POOM 2 pre-alpha", center_x, center_y, half_x, 'center')
-  love.graphics.printf("(c)2014 P1X", center_x, center_y+64, half_x*2, 'center',0,0.5)
+  local scan_line = 8/((love.timer.getTime() - (timer+2))*16)
+  love.graphics.draw(p1x_logo,0,0)
+  love.graphics.setLineWidth(2)
+  love.graphics.setLineStyle('rough')
+  love.graphics.setColor(0,0,0,255)
+  for y=0,SCREEN_W do
+    for x=0,SCREEN_H do
+      if scan_line > 0 and  y % math.floor(scan_line) == 0 then
+        love.graphics.line( x,y,SCREEN_W,y )
+      end
+    end
+  end
+  love.graphics.setColor(255,255,255,255)
 end
 
 math.round = function(num, idp)
@@ -519,8 +537,8 @@ function draw_gui()
   p1_score = '00000000'
   p2_score = '00000000'
 
-  if joysticks[1] then p1_state = 'READY' end
-  if joysticks[2] then p2_state = 'READY' end
+  if PLAYERS > 0 then p1_state = 'READY' end
+  if PLAYERS == 2 then p2_state = 'READY' end
 
   love.graphics.printf(player[0].score, half_x-64-8, 2, 128,'right',0,0.5)
   love.graphics.printf(player[1].score, half_x+8, 2, 128, 'left',0,0.5)
@@ -534,7 +552,7 @@ function draw_gui()
 
   if message_show then
     if love.timer.getTime()-timer < message_time then
-      love.graphics.printf(message, message_pos_x, half_y-24, 0, 'center',0,1.5)
+      love.graphics.printf(message, message_pos_x, half_y-24, 0, 'center',0,1)
     else
       message_show = false
     end
@@ -571,7 +589,7 @@ function love.draw()
   end
 end
 
-function build_terrain(type,x,y)
+function build_terrain(p,type,x,y)
   local new_terrain = -1
 
   if x > 1 and y > 1 and x <= map_w - 1 and y <= map_w - 1 then
@@ -579,6 +597,9 @@ function build_terrain(type,x,y)
     if type == 'platform' then
       if map[y][x] == 0 then
         new_terrain = 1
+        if map[y+1][x] == 2 or map[y+1][x] == 4 then
+          new_terrain = 3
+        end
       end
       if map[y][x] == 4 then
         new_terrain = 3
@@ -586,7 +607,14 @@ function build_terrain(type,x,y)
       if map[y][x] == 4 and ( map[y-1][x] == 4 or map[y-1][x] == 1 or map[y-1][x] == 3 ) then
         new_terrain = 2
       end
-
+      if map[y][x-1] == 4 then
+        -- platform next to the ladder
+        map[y][x-1] = 2
+      end
+      if map[y][x+1] == 4 then
+        -- platform next to the ladder
+        map[y][x+1] = 2
+      end
     end
 
     if type == 'ladder' then
@@ -595,21 +623,25 @@ function build_terrain(type,x,y)
         if map[y-1][x] == 1 then
           map[y-1][x] = 3
         end
+        if map[y+1][x] == 1 or map[y+1][x] == 3 then
+          map[y+1][x] = 2
+        end
       end
       if map[y][x] == 1 or map[y][x] == 3 then
         new_terrain = 2
       end
     end
 
-      if new_terrain > 0 then
-        if map[y][x] == 4 and new_terrain == 3 then
-          for i=0,1 do
-            if player[i].x == x and player[i].y == y then
-              player[i].sy = 0
-            end
+    if new_terrain > 0 then
+      if map[y][x] == 4 and new_terrain == 3 then
+        for i=0,1 do
+          if player[i].x == x and player[i].y == y then
+            player[i].sy = 0
           end
         end
+      end
       map[y][x] = new_terrain
+      player[p].score = player[p].score + 25
     end
   end
 end
@@ -665,11 +697,11 @@ function love.update(dt)
       -- build platform
       if love.keyboard.isDown('z') then
         if love.keyboard.isDown('right') then
-          build_terrain('platform', player[0].x+1,player[0].y)
+          build_terrain(0,'platform', player[0].x+1,player[0].y)
         elseif love.keyboard.isDown('left') then
-          build_terrain('platform', player[0].x-1,player[0].y)
+          build_terrain(0,'platform', player[0].x-1,player[0].y)
         else
-          build_terrain('platform', player[0].x,player[0].y)
+          build_terrain(0,'platform', player[0].x,player[0].y)
         end
         can_move = false
       end
@@ -677,11 +709,11 @@ function love.update(dt)
       -- build ladder
       if love.keyboard.isDown('x') then
         if love.keyboard.isDown('down') then
-          build_terrain('ladder', player[0].x,player[0].y+1)
+          build_terrain(0,'ladder', player[0].x,player[0].y+1)
         elseif love.keyboard.isDown('up') then
-          build_terrain('ladder', player[0].x,player[0].y-1)
+          build_terrain(0,'ladder', player[0].x,player[0].y-1)
         else
-          build_terrain('ladder', player[0].x,player[0].y)
+          build_terrain(0,'ladder', player[0].x,player[0].y)
         end
         can_move = false
       end
@@ -722,11 +754,11 @@ function love.update(dt)
           -- build platform
           if joystick:isDown(1) then
             if joystick:getAxis(4)>0 then
-              build_terrain('platform', player[i].x+1,player[i].y)
+              build_terrain(i,'platform', player[i].x+1,player[i].y)
             elseif joystick:getAxis(4)<0 then
-              build_terrain('platform', player[i].x-1,player[i].y)
+              build_terrain(i,'platform', player[i].x-1,player[i].y)
             else
-              build_terrain('platform', player[i].x,player[i].y)
+              build_terrain(i,'platform', player[i].x,player[i].y)
             end
             can_move = false
           end
@@ -734,11 +766,11 @@ function love.update(dt)
           -- build ladder
           if joystick:isDown(2) then
             if joystick:getAxis(5)>0 then
-              build_terrain('ladder', player[i].x,player[i].y+1)
+              build_terrain(i,'ladder', player[i].x,player[i].y+1)
             elseif joystick:getAxis(5)<0 then
-              build_terrain('ladder', player[i].x,player[i].y-1)
+              build_terrain(i,'ladder', player[i].x,player[i].y-1)
             else
-              build_terrain('ladder', player[i].x,player[i].y)
+              build_terrain(i,'ladder', player[i].x,player[i].y)
             end
             can_move = false
           end
