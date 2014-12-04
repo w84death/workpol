@@ -11,6 +11,8 @@
 --
 ------------------------------------------------------------
 
+local FULLSCREEN = true
+
 local anim8 = require 'libs.anim8'
 
 local STATE = 'intro'
@@ -20,24 +22,29 @@ local CAMERA_SPEED = 96
 local CAMERA_CAGE = 1.5
 local INTRO_TIME = 2.5
 local BUILD_TIME = 1
+local BUTTON_TIME = 0.5
 local PHASE_0_TIME = 10
 local PLAYER_ANIM_TIME = 1
 local SHROOMS = false
 local MAP_SIZE = 64
 local PLAYERS = 1
+local HELP = true
 
-local SCALE = 3
+local SCALE = 4
 local SCALE_x = 4
 local SCALE_y = 4
 local SCALE_mx = 0
 local SCALE_my = 0
-local SCREEN_W = 160*SCALE
-local SCREEN_H = 144*SCALE
+local SCREEN_W = 256*SCALE--160*SCALE
+local SCREEN_H = 160*SCALE--144*SCALE
+local HALF_X = 0
+local HALF_Y = 0
 
 local player = {}
 local entitie = {}
 local camera = {}
 local timer = love.timer.getTime()
+local last_button_press = love.timer.getTime()
 
 local message = ''
 local message_show = false
@@ -48,19 +55,38 @@ local progress = {}
 local coin = {}
 local phase_timer = love.timer.getTime()
 
+local tile = {}
+local back_tile = {}
+local gui_lcd = {}
+local gui_hearth = {}
+local gui_button = {}
+local gui_cloud = {}
+local box = {}
+
 function love.load()
-    love.window.setMode( SCREEN_W, SCREEN_H)
-    love.window.setTitle( "POOM 2 pre-alpha" )
-    --love.window.setFullscreen( true ,'desktop')
+    if FULLSCREEN then
+      love.window.setFullscreen( true ,'desktop')
+      SCREEN_W = love.window.getWidth()
+      SCREEN_H = love.window.getHeight()
+    else
+      love.window.setMode( SCREEN_W, SCREEN_H)
+    end
+    love.window.setTitle( "WORKPOL alpha" )
     love.mouse.setVisible(false)
 
     love.graphics.setDefaultFilter( 'nearest', 'nearest' )
-    love.graphics.setBackgroundColor( 247, 226, 107 )
+    love.graphics.setBackgroundColor( 0,0,0 )
+
+    HALF_X = math.floor((SCREEN_W/SCALE)*0.5)
+    HALF_Y = math.floor((SCREEN_H/SCALE)*0.5)
+    MAX_Y = math.floor(SCREEN_H/SCALE)
+
 
     -- load sprites
     p1x_logo = love.graphics.newImage( "assets/p1x.png" )
-    tile = {}
-    back_tile = {}
+
+    workpol_logo = love.graphics.newImage( "assets/workpol_logo.png" )
+
 
     for i=1,7 do
       tile[i] = love.graphics.newImage( "assets/tile_"..i..".png" )
@@ -69,6 +95,27 @@ function love.load()
     for i=1,4 do
       back_tile[i] = love.graphics.newImage( "assets/back_tile_"..i..".png" )
     end
+
+    for i=0,2 do
+      gui_lcd[i] = love.graphics.newImage( "assets/gui_lcd_"..i..".png" )
+    end
+
+    for i=0,2 do
+      gui_hearth[i] = love.graphics.newImage( "assets/gui_hearth_"..i..".png" )
+    end
+
+    for i=0,1 do
+      gui_cloud[i] = love.graphics.newImage( "assets/gui_cloud_"..i..".png" )
+    end
+
+    for i=0,5 do
+      gui_button[i] = love.graphics.newImage( "assets/gui_button_"..i..".png" )
+    end
+
+    for i=0,2 do
+      box[i] = love.graphics.newImage( "assets/box_"..i..".png" )
+    end
+
 
     font = love.graphics.newImageFont("assets/font-0.png",
     " abcdefghijklmnopqrstuvwxyz" ..
@@ -83,12 +130,12 @@ function love.load()
     -- map variables
     map_offset_x = 0
     map_offset_y = 0
-    map_display_w = math.floor(love.window.getWidth()/TILE_SIZE/SCALE)+3
-    map_display_h = math.floor(love.window.getHeight()/TILE_SIZE/SCALE)+3
+    map_display_w = math.floor(SCREEN_W/TILE_SIZE/SCALE)+3
+    map_display_h = math.floor(SCREEN_H/TILE_SIZE/SCALE)+3
 
-    center_x = math.floor(love.window.getWidth()/TILE_SIZE)
-    center_y = math.floor(love.window.getHeight()/TILE_SIZE)
-    center_real_x = math.floor(love.window.getWidth()*0.5)
+    center_x = math.floor(SCREEN_W/TILE_SIZE)
+    center_y = math.floor(SCREEN_H/TILE_SIZE)
+    center_real_x = math.floor(SCREEN_W*0.5)
 
     -- map
 
@@ -185,7 +232,13 @@ end
 
 function love.keypressed(k)
     if k == 'escape' then
+      if STATE == 'menu' or STATE == 'intro' then
         love.event.push('quit') -- Quit the game.
+      end
+
+      if STATE == 'game' then
+        STATE = 'menu'
+      end
     end
 end
 
@@ -500,8 +553,11 @@ function draw_entitie()
 end
 
 function draw_intro()
-  local scan_line = 8/((love.timer.getTime() - (timer+2))*16)
-  love.graphics.draw(p1x_logo,0,0)
+  local scan_line = 12/((love.timer.getTime() - (timer+INTRO_TIME-0.5))*16)
+  love.graphics.draw(p1x_logo,
+      math.floor(SCREEN_W/SCALE/2)-80,
+      math.floor(SCREEN_H/SCALE/2)-72)
+
   love.graphics.setLineWidth(2)
   love.graphics.setLineStyle('rough')
   love.graphics.setColor(0,0,0,255)
@@ -513,6 +569,28 @@ function draw_intro()
     end
   end
   love.graphics.setColor(255,255,255,255)
+end
+
+function draw_menu()
+  local left_x = HALF_X-64
+  local right_x = HALF_X+64
+  local menu_y = -64
+
+  love.graphics.draw(workpol_logo,HALF_X-32,16)
+
+  love.graphics.printf("START GAME", left_x-64, MAX_Y + menu_y, 256,'center',0,0.5)
+  love.graphics.draw(gui_button[4],left_x-8,MAX_Y + menu_y-20)
+
+  if HELP then
+    love.graphics.printf("HELP IS VISIBLE", right_x-64, MAX_Y + menu_y, 256,'center',0,0.5)
+  else
+    love.graphics.printf("HELP IS HIDDEN", right_x-64, MAX_Y + menu_y, 256,'center',0,0.5)
+  end
+  love.graphics.draw(gui_button[5],right_x-8,MAX_Y + menu_y-20)
+
+  love.graphics.printf("KRZYSZTOF JANKOWSKI", HALF_X-32, MAX_Y-16, 256,'center',0,0.25)
+  love.graphics.printf("(C)2014 P1X", HALF_X-32, MAX_Y-12, 256,'center',0,0.25)
+
 end
 
 math.round = function(num, idp)
@@ -529,36 +607,78 @@ function show_message( msg )
 end
 
 function draw_gui()
-  local half_x = math.floor(love.window.getWidth()/SCALE)*0.5
-  local half_y = math.floor(love.window.getHeight()/SCALE)*0.5
+  local right = math.floor(SCREEN_W/SCALE)
+  local HALF_X = math.floor(right*0.5)
+  local bottom = math.floor(SCREEN_H/SCALE)
+  local HALF_Y = math.floor(bottom*0.5)
 
-  p1_state = 'JOIN GAME'
-  p2_state = 'JOIN GAME'
-  p1_score = '00000000'
-  p2_score = '00000000'
+  local lcd_message = "Collect coins!"
 
-  if PLAYERS > 0 then p1_state = 'READY' end
-  if PLAYERS == 2 then p2_state = 'READY' end
 
-  love.graphics.printf(player[0].score, half_x-64-8, 2, 128,'right',0,0.5)
-  love.graphics.printf(player[1].score, half_x+8, 2, 128, 'left',0,0.5)
-
-  love.graphics.printf('1P '..p1_state, half_x-96-8, 10, 192,'right',0,0.5)
-  love.graphics.printf('2P '..p2_state, half_x+8, 10, 192, 'left',0,0.5)
+  -- draw LCD
 
   if PHASE == 0 then
-    progress.animation:draw(progress.sprite, half_x-8, 2)
+    lcd_message = "Build for "..math.floor((PHASE_0_TIME - (love.timer.getTime() - phase_timer)))
   end
 
+  love.graphics.draw(gui_lcd[0],HALF_X-8-48,4)
+  love.graphics.draw(gui_lcd[1],HALF_X-8-32,4)
+  love.graphics.draw(gui_lcd[1],HALF_X-8-16,4)
+  love.graphics.draw(gui_lcd[1],HALF_X-8,4)
+  love.graphics.draw(gui_lcd[1],HALF_X+16-8,4)
+  love.graphics.draw(gui_lcd[1],HALF_X+32-8,4)
+  love.graphics.draw(gui_lcd[2],HALF_X+48-8,4)
+  love.graphics.printf(lcd_message, HALF_X-64, 8, 256,'center',0,0.5)
+
+
+  -- draw buttons
+  if HELP then
+    love.graphics.draw(gui_button[0],right-48,bottom-16)
+    love.graphics.draw(gui_button[3],right-32,bottom-16)
+    love.graphics.draw(gui_button[1],right-16,bottom-16)
+    love.graphics.draw(gui_button[2],right-32,bottom-32)
+
+    love.graphics.draw(gui_cloud[0],0,bottom-32)
+    love.graphics.draw(gui_button[4],0,bottom-16)
+
+    love.graphics.draw(gui_cloud[1],16,bottom-32)
+    love.graphics.draw(gui_button[5],16,bottom-16)
+  end
+
+  -- build buttons
+
+  if PHASE == 0 then
+    -- build platform
+    if HELP then
+      local px = ((player[0].x-map_x)*TILE_SIZE)+map_offset_x-(TILE_SIZE*2)
+      local py = ((player[0].y-map_y)*TILE_SIZE)+map_offset_y-(TILE_SIZE*2)
+      if love.keyboard.isDown('a') then
+        love.graphics.setColor(255,255,255,64)
+        love.graphics.draw(gui_button[0],px-16,py)
+        love.graphics.draw(gui_button[4],px,py)
+        love.graphics.draw(gui_button[1],px+16,py)
+        love.graphics.setColor(255,255,255,255)
+      end
+      if love.keyboard.isDown('s') then
+        love.graphics.setColor(255,255,255,64)
+        love.graphics.draw(gui_button[2],px,py-16)
+        love.graphics.draw(gui_button[5],px,py)
+        love.graphics.draw(gui_button[3],px,py+16)
+        love.graphics.setColor(255,255,255,255)
+      end
+    end
+  end
+
+
+  -- draw flash message
   if message_show then
     if love.timer.getTime()-timer < message_time then
-      love.graphics.printf(message, message_pos_x, half_y-24, 0, 'center',0,1)
+      love.graphics.printf(message, message_pos_x, HALF_Y-24, 0, 'center',0,1)
     else
       message_show = false
     end
   end
 
-  --love.graphics.printf(math.floor(10*SCALE_x) .. ' ' .. math.floor(10*SCALE_y), half_x, 14, 0, 'center',0,0.5)
 end
 
 function draw_game_over()
@@ -575,6 +695,9 @@ function love.draw()
 
   if STATE == 'intro' then
     draw_intro()
+  end
+  if STATE == 'menu' then
+    draw_menu()
   end
   if STATE == 'game' then
     draw_map()
@@ -659,10 +782,19 @@ function love.update(dt)
   end
 
   if STATE == 'intro' then
-    if love.timer.getTime() - timer > INTRO_TIME then
+    if love.timer.getTime() - timer > INTRO_TIME or love.keyboard.isDown('a') then
+      STATE = 'menu'
+    end
+  end
+  if STATE == 'menu' then
+    if love.keyboard.isDown('a') then
       STATE = 'game'
       phase_timer = love.timer.getTime()
       show_message('BUILD PHASE STARTED')
+    end
+    if love.keyboard.isDown('s') and (love.timer.getTime()-last_button_press) > BUTTON_TIME then
+      HELP = not HELP
+      last_button_press = love.timer.getTime()
     end
   end
   if STATE == 'game' then
@@ -695,7 +827,7 @@ function love.update(dt)
 
     if PHASE == 0 then
       -- build platform
-      if love.keyboard.isDown('z') then
+      if love.keyboard.isDown('a') then
         if love.keyboard.isDown('right') then
           build_terrain(0,'platform', player[0].x+1,player[0].y)
         elseif love.keyboard.isDown('left') then
@@ -707,7 +839,7 @@ function love.update(dt)
       end
 
       -- build ladder
-      if love.keyboard.isDown('x') then
+      if love.keyboard.isDown('s') then
         if love.keyboard.isDown('down') then
           build_terrain(0,'ladder', player[0].x,player[0].y+1)
         elseif love.keyboard.isDown('up') then
