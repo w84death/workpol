@@ -23,7 +23,8 @@ local INTRO_TIME = 2.5
 local BUILD_TIME = 1
 local BUTTON_TIME = 0.5
 local PHASE_0_TIME = 10
-local PLAYER_ANIM_TIME = 1
+local PLAYER_ANIM_TIME = 0.1
+local PLAYER_IDLE_TIME = 3
 local SHROOMS = false
 local MAP_SIZE = 64
 local PLAYERS = 1
@@ -41,7 +42,7 @@ local HALF_Y = 0
 
 local player = {}
 local items = {}
-local enemies = {}
+local enemie = {}
 local camera = {}
 local camera_target_x = 0
 local camera_target_y = 0
@@ -246,13 +247,11 @@ end
 
 
 function players_create()
-  local cx = math.floor(#map[0]/2)
-  local cy = math.floor(#map/2)
   player[0] = {}
   player[0].ready = false
   player[0].score = 0
-  player[0].x = cx
-  player[0].y = cy
+  player[0].x = MAP_SIZE/2
+  player[0].y = MAP_SIZE/2
   player[0].sx = 0
   player[0].sy = 0
   player[0].speed = 100
@@ -265,14 +264,16 @@ function players_create()
   player[0].animation[0] = anim8.newAnimation(player[0].grid('1-2',1), 0.5)
   player[0].animation[1] = anim8.newAnimation(player[0].grid('1-4',2), 0.1)
   player[0].animation[2] = anim8.newAnimation(player[0].grid('1-4',3), 0.1)
+  player[0].animation[3] = anim8.newAnimation(player[0].grid('3-4',1), 0.8)
   player[0].anim_time = love.timer.getTime()
+  player[0].idle_time = love.timer.getTime()
   player[0].selector = love.graphics.newImage( "assets/selector0.png" )
 
   player[1] = {}
   player[1].ready = false
   player[1].score = 0
-  player[1].x = 17
-  player[1].y = 16
+  player[1].x = MAP_SIZE/2 + 2
+  player[1].y = MAP_SIZE/2
   player[1].sx = 0
   player[1].sy = 0
   player[1].speed = 100
@@ -285,11 +286,35 @@ function players_create()
   player[1].animation[0] = anim8.newAnimation(player[1].grid('1-2',1), 0.5)
   player[1].animation[1] = anim8.newAnimation(player[1].grid('1-4',2), 0.1)
   player[1].animation[2] = anim8.newAnimation(player[1].grid('1-4',3), 0.1)
+  player[1].animation[3] = anim8.newAnimation(player[1].grid('3-4',1), 0.5)
   player[1].animation[0]:gotoFrame(1)
   player[1].animation[1]:gotoFrame(2)
   player[1].animation[2]:gotoFrame(2)
   player[1].anim_time = love.timer.getTime()
+  player[1].idle_time = love.timer.getTime()
   player[1].selector = love.graphics.newImage( "assets/selector1.png" )
+end
+
+
+function enemie_create()
+  local free_id = #enemie
+  enemie[free_id] = {}
+  enemie[free_id].alive = true
+  enemie[free_id].x = MAP_SIZE/2
+  enemie[free_id].y = MAP_SIZE/2
+  enemie[free_id].sx = 0
+  enemie[free_id].sy = 0
+  enemie[free_id].speed = 75
+  enemie[free_id].standing = true
+  enemie[free_id].sprite = love.graphics.newImage('assets/kudlaty.png')
+  enemie[free_id].grid = anim8.newGrid(16, 16, enemie[free_id].sprite:getWidth(), enemie[free_id].sprite:getHeight())
+  enemie[free_id].anim_current = 0
+  enemie[free_id].flip = false
+  enemie[free_id].animation = {}
+  enemie[free_id].animation[0] = anim8.newAnimation(enemie[free_id].grid('1-4',1), 0.5)
+  --enemie[free_id].animation[1] = anim8.newAnimation(enemie[0].grid('1-4',2), 0.1)
+  --enemie[free_id].animation[2] = anim8.newAnimation(enemie[free_id].grid('1-4',3), 0.1)
+  enemie[free_id].anim_time = love.timer.getTime()
 end
 
 function camera_follow(dt)
@@ -521,23 +546,37 @@ end
 
 function draw_player()
   for i=0,PLAYERS-1 do
-    --if joysticks[i+1] then
-      --player[i].animation[player[i].anim_current]:resume()
-      player[i].animation[player[i].anim_current]:draw(player[i].sprite, ((player[i].x-map_x)*TILE_SIZE)+map_offset_x-(TILE_SIZE*2)+player[i].sx, ((player[i].y-map_y)*TILE_SIZE)+map_offset_y-(TILE_SIZE*2)+player[i].sy)
-      player[i].animation[player[i].anim_current]:flip(player[i].flip)
-      if player[i].standing and player[i].anim_time > PLAYER_ANIM_TIME then
-        player[i].anim_current = 0
-        player[i].anim_time = 0
+
+      if player[i].standing then
+        if player[i].anim_time > 0 and love.timer.getTime() - player[i].anim_time > PLAYER_ANIM_TIME then
+          player[i].anim_current = 0
+          player[i].anim_time = 0
+          player[i].idle_time = love.timer.getTime()
+        elseif love.timer.getTime() - player[i].idle_time > PLAYER_IDLE_TIME then
+          if math.random()*10 > 5 then
+             player[i].anim_current = 0
+             player[i].idle_time = love.timer.getTime()
+          else
+            player[i].anim_current = 3
+            player[i].idle_time = love.timer.getTime()
+          end
+        end
+
+        if player[i].anim_current == 3 and love.timer.getTime() - player[i].idle_time > PLAYER_IDLE_TIME/2 then
+          player[i].anim_current = 0
+        end
       end
-      if not player[i].standing and player[i].anim_time > PLAYER_ANIM_TIME then
+      if not player[i].standing and love.timer.getTime() - player[i].anim_time > PLAYER_ANIM_TIME then
         player[i].animation[2]:pause()
         player[i].anim_time = 0
       end
+
+      player[i].animation[player[i].anim_current]:flip(player[i].flip)
+      player[i].animation[player[i].anim_current]:draw(player[i].sprite, ((player[i].x-map_x)*TILE_SIZE)+map_offset_x-(TILE_SIZE*2)+player[i].sx, ((player[i].y-map_y)*TILE_SIZE)+map_offset_y-(TILE_SIZE*2)+player[i].sy)
       love.graphics.draw(
         player[i].selector,
         ((player[i].x-map_x)*TILE_SIZE)+map_offset_x-(TILE_SIZE*2),
         ((player[i].y-map_y)*TILE_SIZE)+map_offset_y-(TILE_SIZE*2))
-    --end
   end
 end
 
