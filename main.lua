@@ -1,8 +1,7 @@
 --  P1X, Krzysztof Jankowski
---  (codename) POOM 2
+--  WORKPOL
 --
---  abstract: two small creatures builds massive
---            constructions because of reasons
+--  abstract: Game about Polish company that builds things.
 --  created: 13-11-2014
 --  license: do what you want and dont bother me
 --

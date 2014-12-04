@@ -1,8 +1,8 @@
-# (codename) POOM 2
+# WORKPOL
 P1X, Krzysztof Jankowski
 
 ## abstract
-two small creatures builds massive constructions because of reasons
+Game about Polish company that builds things. Player takes a role of one or two workers. Remember to always wear safety equipment.
 
 ## details
 - created: 13-11-2014
