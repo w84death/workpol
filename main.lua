@@ -40,8 +40,11 @@ local HALF_X = 0
 local HALF_Y = 0
 
 local player = {}
-local entitie = {}
+local items = {}
+local enemies = {}
 local camera = {}
+local camera_target_x = 0
+local camera_target_y = 0
 local timer = love.timer.getTime()
 local last_button_press = love.timer.getTime()
 
@@ -140,14 +143,11 @@ function love.load()
 
     map_w = MAP_SIZE
     map_h = MAP_SIZE
-    map_x = 2
-    map_y = 2
+    map_x = math.floor((MAP_SIZE/2)-(map_display_w/2))-8
+    map_y = math.floor((MAP_SIZE/2)-(map_display_h/2))
 
     map = map_create_empty()
     map = map_start(map)
-
-    camera_target_x = 16-math.floor(map_display_w*0.5)
-    camera_target_y = 16-math.floor(map_display_h*0.5)
 
     -- gamepad
     local joysticks = love.joystick.getJoysticks()
@@ -185,23 +185,26 @@ function map_create_empty()
 end
 
 function map_start(map)
-  map[14][15] = 1
-  map[14][16] = 3
-  map[14][17] = 1
-  map[15][16] = 4
-  map[16][13] = 1
-  map[16][14] = 1
-  map[16][15] = 1
-  map[16][16] = 2
-  map[16][17] = 1
-  map[17][13] = 5
-  map[17][14] = 5
-  map[17][15] = 5
-  map[17][16] = 5
-  map[17][17] = 5
-  map[18][14] = 5
-  map[18][15] = 5
-  map[18][16] = 5
+  local cx = math.floor(#map[0]/2)
+  local cy = math.floor(#map/2)
+
+  map[cy-2][cx-1] = 1
+  map[cy-2][cx] = 3
+  map[cy-2][cx+1] = 1
+  map[cy-1][cx] = 4
+  map[cy][cx-3] = 1
+  map[cy][cx-2] = 1
+  map[cy][cx-1] = 1
+  map[cy][cx] = 2
+  map[cy][cx+1] = 1
+  map[cy+1][cx-3] = 5
+  map[cy+1][cx-2] = 5
+  map[cy+1][cx-1] = 5
+  map[cy+1][cx] = 5
+  map[cy+1][cx+1] = 5
+  map[cy+2][cx-2] = 5
+  map[cy+2][cx-1] = 5
+  map[cy+2][cx] = 5
   return map
 end
 
@@ -226,7 +229,7 @@ function coin_insert(x,y)
   c.x = x
   c.y = y
   c.anim = math.floor(math.random()*#coin.animation)
-  table.insert(entitie,c)
+  table.insert(items,c)
 end
 
 function love.keypressed(k)
@@ -243,11 +246,13 @@ end
 
 
 function players_create()
+  local cx = math.floor(#map[0]/2)
+  local cy = math.floor(#map/2)
   player[0] = {}
   player[0].ready = false
   player[0].score = 0
-  player[0].x = 14
-  player[0].y = 16
+  player[0].x = cx
+  player[0].y = cy
   player[0].sx = 0
   player[0].sy = 0
   player[0].speed = 100
@@ -378,10 +383,10 @@ function map_proc(key, x, y)
 end
 
 function collect_coin(p)
-  for i=0,#entitie do
-    if entitie[i] then
-      if entitie[i].coin and entitie[i].x == player[p].x and entitie[i].y == player[p].y then
-        entitie[i].coin = false
+  for i=0,#items do
+    if items[i] then
+      if items[i].coin and items[i].x == player[p].x and items[i].y == player[p].y then
+        items[i].coin = false
         player[p].score = player[p].score + 50
       end
     end
@@ -391,9 +396,9 @@ end
 function coin_count_all()
   local count = 0
 
-  for i=0,#entitie do
-    if entitie[i] then
-       if entitie[i].coin then count = count + 1 end
+  for i=0,#items do
+    if items[i] then
+       if items[i].coin then count = count + 1 end
     end
   end
 
@@ -536,12 +541,12 @@ function draw_player()
   end
 end
 
-function draw_entitie()
+function draw_items()
   local ex, ey, e, i,r
 
-  for i=0,#entitie do
-    if entitie[i] then
-      e = entitie[i]
+  for i=0,#items do
+    if items[i] then
+      e = items[i]
       ex = ((e.x-map_x)*TILE_SIZE)+map_offset_x-(TILE_SIZE*2)
       ey = ((e.y-map_y)*TILE_SIZE)+map_offset_y-(TILE_SIZE*2)
       if e.coin then
@@ -701,7 +706,7 @@ function love.draw()
   if STATE == 'game' then
     draw_map()
     if PHASE == 1 then
-      draw_entitie()
+      draw_items()
     end
     draw_player()
     draw_gui()
