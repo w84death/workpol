@@ -22,7 +22,7 @@ local CAMERA_CAGE = 1.5
 local INTRO_TIME = 2.5
 local BUILD_TIME = 1
 local BUTTON_TIME = 0.5
-local PHASE_0_TIME = 10
+local PHASE_0_TIME = 30
 local PLAYER_ANIM_TIME = 0.1
 local PLAYER_IDLE_TIME = 3
 local SHROOMS = false
@@ -40,9 +40,10 @@ local SCREEN_H = 160*SCALE--144*SCALE
 local HALF_X = 0
 local HALF_Y = 0
 
+local level = 0
 local player = {}
 local items = {}
-local enemie = {}
+local enemy = {}
 local camera = {}
 local camera_target_x = 0
 local camera_target_y = 0
@@ -65,6 +66,8 @@ local gui_hearth = {}
 local gui_button = {}
 local gui_cloud = {}
 local box = {}
+
+local debug_message = 'enemy?'
 
 function love.load()
     if FULLSCREEN then
@@ -186,8 +189,8 @@ function map_create_empty()
 end
 
 function map_start(map)
-  local cx = math.floor(#map[0]/2)
-  local cy = math.floor(#map/2)
+  local cx = MAP_SIZE/2
+  local cy = MAP_SIZE/2
 
   map[cy-2][cx-1] = 1
   map[cy-2][cx] = 3
@@ -296,25 +299,90 @@ function players_create()
 end
 
 
-function enemie_create()
-  local free_id = #enemie
-  enemie[free_id] = {}
-  enemie[free_id].alive = true
-  enemie[free_id].x = MAP_SIZE/2
-  enemie[free_id].y = MAP_SIZE/2
-  enemie[free_id].sx = 0
-  enemie[free_id].sy = 0
-  enemie[free_id].speed = 75
-  enemie[free_id].standing = true
-  enemie[free_id].sprite = love.graphics.newImage('assets/kudlaty.png')
-  enemie[free_id].grid = anim8.newGrid(16, 16, enemie[free_id].sprite:getWidth(), enemie[free_id].sprite:getHeight())
-  enemie[free_id].anim_current = 0
-  enemie[free_id].flip = false
-  enemie[free_id].animation = {}
-  enemie[free_id].animation[0] = anim8.newAnimation(enemie[free_id].grid('1-4',1), 0.5)
-  --enemie[free_id].animation[1] = anim8.newAnimation(enemie[0].grid('1-4',2), 0.1)
-  --enemie[free_id].animation[2] = anim8.newAnimation(enemie[free_id].grid('1-4',3), 0.1)
-  enemie[free_id].anim_time = love.timer.getTime()
+function enemy_create(x,y)
+  local new_enemy = {}
+  new_enemy.alive = true
+  new_enemy.x = x
+  new_enemy.y = y
+  new_enemy.sx = 0
+  new_enemy.sy = 0
+  new_enemy.speed = 50
+  new_enemy.standing = true
+  new_enemy.anim_current = 0
+  new_enemy.flip = false
+  new_enemy.direction = 1--math.floor(math.random())
+  new_enemy.sprite = love.graphics.newImage('assets/kudlaty.png')
+  new_enemy.grid = anim8.newGrid(16, 16, new_enemy.sprite:getWidth(), new_enemy.sprite:getHeight())
+  new_enemy.animation = {}
+  new_enemy.animation[0] = anim8.newAnimation(new_enemy.grid('1-4',1), 0.1)
+  new_enemy.animation[0]:gotoFrame(1 + math.floor(math.random()*3))
+  table.insert(enemy,new_enemy)
+end
+
+function enemy_spawn_at_map(max)
+  local free_spot = {}
+  local id = 0
+  local r = 0
+
+  for y=0,map_h do
+    for x=0,map_w do
+      if map[y][x] == 1 or map[y][x] == 2 or map[y][x] == 3 then
+        free_spot[id] = {}
+        free_spot[id].x = x
+        free_spot[id].y = y
+        id = id + 1
+      end
+    end
+  end
+
+  for i=1,max do
+    r = math.floor(math.random()*#free_spot)
+    enemy_create(free_spot[r].x,free_spot[r].y)
+    table.remove(free_spot,r)
+  end
+end
+
+function enemy_move(i,dt)
+  local bounds = 6
+
+  if enemy[i].direction == 1 then
+    enemy[i].flip = true
+    if enemy[i].sx + bounds < TILE_SIZE*0.5 then
+      enemy[i].sx = enemy[i].sx + enemy[i].speed * dt
+      enemy[i].sy = 0
+    else
+      if map_proc(1,enemy[i].x+1, enemy[i].y) then
+        enemy[i].sx = enemy[i].sx + enemy[i].speed * dt
+        enemy[i].sy = 0
+        if enemy[i].sx >= TILE_SIZE*0.5 then
+          enemy[i].sx = -TILE_SIZE*0.5
+          enemy[i].x = enemy[i].x + 1
+        end
+      else
+        enemy[i].direction = 0
+        enemy[i].flip = false
+      end
+    end
+  else
+    enemy[i].flip = false
+    if enemy[i].sx - bounds > -TILE_SIZE*0.5 then
+      enemy[i].sx = enemy[i].sx - enemy[i].speed * dt
+      enemy[i].sy = 0
+    else
+      if map_proc(3,enemy[i].x-1, enemy[i].y) then
+        enemy[i].sx = enemy[i].sx - enemy[i].speed * dt
+        enemy[i].sy = 0
+        if enemy[i].sx <= -TILE_SIZE*0.5 then
+          enemy[i].sx = TILE_SIZE*0.5
+          enemy[i].x = enemy[i].x - 1
+        end
+      else
+        enemy[i].direction = 1
+        enemy[i].flip = true
+      end
+    end
+  end
+
 end
 
 function camera_follow(dt)
@@ -378,10 +446,9 @@ end
 
 function map_proc(key, x, y)
   local tile = map[y][x]
-  debug = tile
 
   if key == 1 or key == 3 then
-    if tile == 1 or tile == 2 or tile == 3 then
+    if tile == 1 or tile == 2 or tile == 3 or tile == 4 then
       return true
     else
       return false
@@ -408,7 +475,7 @@ function map_proc(key, x, y)
 end
 
 function collect_coin(p)
-  for i=0,#items do
+  for i=1,#items do
     if items[i] then
       if items[i].coin and items[i].x == player[p].x and items[i].y == player[p].y then
         items[i].coin = false
@@ -421,7 +488,7 @@ end
 function coin_count_all()
   local count = 0
 
-  for i=0,#items do
+  for i=1,#items do
     if items[i] then
        if items[i].coin then count = count + 1 end
     end
@@ -572,11 +639,31 @@ function draw_player()
       end
 
       player[i].animation[player[i].anim_current]:flip(player[i].flip)
-      player[i].animation[player[i].anim_current]:draw(player[i].sprite, ((player[i].x-map_x)*TILE_SIZE)+map_offset_x-(TILE_SIZE*2)+player[i].sx, ((player[i].y-map_y)*TILE_SIZE)+map_offset_y-(TILE_SIZE*2)+player[i].sy)
+      player[i].animation[player[i].anim_current]:draw(
+        player[i].sprite,
+        ((player[i].x-map_x)*TILE_SIZE)+map_offset_x-(TILE_SIZE*2)+player[i].sx,
+        ((player[i].y-map_y)*TILE_SIZE)+map_offset_y-(TILE_SIZE*2)+player[i].sy
+      )
       love.graphics.draw(
         player[i].selector,
         ((player[i].x-map_x)*TILE_SIZE)+map_offset_x-(TILE_SIZE*2),
-        ((player[i].y-map_y)*TILE_SIZE)+map_offset_y-(TILE_SIZE*2))
+        ((player[i].y-map_y)*TILE_SIZE)+map_offset_y-(TILE_SIZE*2)
+      )
+  end
+end
+
+function draw_enemy()
+
+  for i=1,#enemy do
+    if enemy[i] and enemy[i].alive then
+      e = enemy[i]
+      e.animation[e.anim_current]:flip(e.flip)
+      e.animation[e.anim_current]:draw(
+        e.sprite,
+        ((e.x-map_x)*TILE_SIZE)+map_offset_x-(TILE_SIZE*2)+e.sx,
+        ((e.y-map_y)*TILE_SIZE)+map_offset_y-(TILE_SIZE*2)+e.sy
+      )
+    end
   end
 end
 
@@ -722,6 +809,7 @@ function draw_gui()
     end
   end
 
+  love.graphics.printf('DEBUG: '.. debug_message ..' | '..#enemy, 0, 0, 256, 'left',0,0.5)
 end
 
 function draw_game_over()
@@ -744,8 +832,10 @@ function love.draw()
   end
   if STATE == 'game' then
     draw_map()
+    draw_enemy()
     if PHASE == 1 then
       draw_items()
+
     end
     draw_player()
     draw_gui()
@@ -849,6 +939,7 @@ function love.update(dt)
         PHASE = 1
         phase_timer = love.timer.getTime()
         coins_create_on_map()
+        enemy_spawn_at_map(level)
         show_message('SURVIVAL PHASE STARTED')
       end
     end
@@ -862,6 +953,7 @@ function love.update(dt)
         progress.animation:gotoFrame(1)
         phase_timer = love.timer.getTime()
         show_message('BUILD PHASE STARTED')
+        level = level + 1
       end
     end
 
@@ -977,6 +1069,13 @@ function love.update(dt)
           player[i].px = player[i].x
           player[i].py = player[i].y
         end
+      end
+    end
+
+    for i=1,#enemy do
+      if enemy and enemy[i].alive then
+        enemy[i].animation[enemy[i].anim_current]:update(dt)
+        enemy_move(i,dt)
       end
     end
 
